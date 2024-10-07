@@ -1,101 +1,89 @@
 import bpy
-import bmesh
+import json
+import os
+import tempfile
 import uuid
-try:
-    import bpy
-    from io_scene_gltf2.io.exp import gltf2_io_export
-    from io_scene_gltf2.blender.exp import gltf2_blender_export
-except ImportError:
-    # We're not in Blender, use fake-bpy-module
-    import fake_bpy_module_latest as bpy
-    from fake_bpy_module_latest.io_scene_gltf2.io.exp import gltf2_io_export
-    from fake_bpy_module_latest.io_scene_gltf2.blender.exp import gltf2_blender_export
-from ...shared.modules.vircadia_world_meta.python.world import *
+from datetime import datetime
+from ...shared.modules.vircadia_world_meta.python.world import TableMesh, TableMaterial, TableTexture, TableImage
 
 class BlenderToWorldGLTF:
     def __init__(self):
-        self.export_settings = gltf2_blender_export.create_default_export_settings()
-        self.export_settings['gltf_format'] = 'JSON'
-        self.export_settings['use_selection'] = True
+        self.world_uuid = str(uuid.uuid4())  # This should be set to the actual world UUID
 
     def convert_mesh(self, obj: bpy.types.Object) -> TableMesh:
-        mesh = obj.data
-        
-        # Create a new bmesh to triangulate
-        bm = bmesh.new()
-        bm.from_mesh(mesh)
-        bmesh.ops.triangulate(bm, faces=bm.faces[:])
-        
-        # Create primitives
-        primitives = []
-        for material_index in range(len(obj.material_slots)):
-            primitive = self._create_primitive(bm, material_index)
-            if primitive:
-                primitives.append(primitive)
-        
-        bm.free()
+        # Ensure the object is selected
+        bpy.ops.object.select_all(action='DESELECT')
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+
+        # Create a temporary file to export to
+        with tempfile.NamedTemporaryFile(suffix=".gltf", delete=False) as temp_file:
+            temp_path = temp_file.name
+
+        # Export to glTF
+        bpy.ops.export_scene.gltf(
+            filepath=temp_path,
+            use_selection=True,
+            export_format='GLTF_SEPARATE',
+            export_texcoords=True,
+            export_normals=True,
+            export_materials='EXPORT'
+        )
+
+        # Read the exported JSON
+        with open(temp_path, 'r') as f:
+            gltf_data = json.load(f)
+
+        # Clean up temporary files
+        os.unlink(temp_path)
+        os.unlink(temp_path.replace('.gltf', '.bin'))
+
+        # Extract Vircadia-specific properties from the object
+        vircadia_props = {
+            prop: getattr(obj, prop)
+            for prop in dir(obj)
+            if prop.startswith('vircadia_')
+        }
 
         # Create TableMesh object
         table_mesh = TableMesh(
             vircadia_uuid=str(uuid.uuid4()),
-            vircadia_world_uuid=str(uuid.uuid4()),  # This should be set to the actual world UUID
-            name=obj.name,
-            primitives=primitives,
-            vircadia_version="1.0",  # Set appropriate version
+            vircadia_world_uuid=self.world_uuid,
+            vircadia_version=vircadia_props.get('vircadia_version', "1.0"),
             vircadia_createdat=datetime.now(),
             vircadia_updatedat=datetime.now(),
-            vircadia_babylonjs_lod_mode=None,  # Set if applicable
-            vircadia_babylonjs_lod_auto=None,  # Set if applicable
-            vircadia_babylonjs_lod_distance=None,  # Set if applicable
-            vircadia_babylonjs_lod_size=None,  # Set if applicable
-            vircadia_babylonjs_lod_hide=None,  # Set if applicable
-            vircadia_babylonjs_billboard_mode=None,  # Set if applicable
-            vircadia_babylonjs_light_lightmap=None,  # Set if applicable
-            vircadia_babylonjs_light_level=None,  # Set if applicable
-            vircadia_babylonjs_light_color_space=None,  # Set if applicable
-            vircadia_babylonjs_light_texcoord=None,  # Set if applicable
-            vircadia_babylonjs_light_use_as_shadowmap=None,  # Set if applicable
-            vircadia_babylonjs_light_mode=None,  # Set if applicable
-            vircadia_babylonjs_script_agent_scripts=None,  # Set if applicable
-            vircadia_babylonjs_script_persistent_scripts=None,  # Set if applicable
+            gltf_name=obj.name,
+            gltf_primitives=gltf_data['meshes'][0]['primitives'],
+            gltf_weights=gltf_data['meshes'][0].get('weights'),
+            vircadia_babylonjs_lod_mode=vircadia_props.get('vircadia_babylonjs_lod_mode'),
+            vircadia_babylonjs_lod_auto=vircadia_props.get('vircadia_babylonjs_lod_auto'),
+            vircadia_babylonjs_lod_distance=vircadia_props.get('vircadia_babylonjs_lod_distance'),
+            vircadia_babylonjs_lod_size=vircadia_props.get('vircadia_babylonjs_lod_size'),
+            vircadia_babylonjs_lod_hide=vircadia_props.get('vircadia_babylonjs_lod_hide'),
+            vircadia_babylonjs_billboard_mode=vircadia_props.get('vircadia_babylonjs_billboard_mode'),
+            vircadia_babylonjs_light_lightmap=vircadia_props.get('vircadia_babylonjs_light_lightmap'),
+            vircadia_babylonjs_light_level=vircadia_props.get('vircadia_babylonjs_light_level'),
+            vircadia_babylonjs_light_color_space=vircadia_props.get('vircadia_babylonjs_light_color_space'),
+            vircadia_babylonjs_light_texcoord=vircadia_props.get('vircadia_babylonjs_light_texcoord'),
+            vircadia_babylonjs_light_use_as_shadowmap=vircadia_props.get('vircadia_babylonjs_light_use_as_shadowmap'),
+            vircadia_babylonjs_light_mode=vircadia_props.get('vircadia_babylonjs_light_mode'),
+            vircadia_babylonjs_script_agent_scripts=vircadia_props.get('vircadia_babylonjs_script_agent_scripts'),
+            vircadia_babylonjs_script_persistent_scripts=vircadia_props.get('vircadia_babylonjs_script_persistent_scripts'),
         )
 
         return table_mesh
 
-    def _create_primitive(self, bm: bmesh.types.BMesh, material_index: int) -> dict:
-        # Filter faces by material index
-        faces = [f for f in bm.faces if f.material_index == material_index]
-        if not faces:
-            return None
+    def convert_material(self, material: bpy.types.Material) -> TableMaterial:
+        # This method would convert a Blender material to a TableMaterial
+        # Implementation depends on how materials are set up in your Blender scene
+        pass
 
-        # Collect vertex data
-        positions = []
-        normals = []
-        uvs = []
-        indices = []
+    def convert_texture(self, texture: bpy.types.Texture) -> TableTexture:
+        # This method would convert a Blender texture to a TableTexture
+        # Implementation depends on how textures are set up in your Blender scene
+        pass
 
-        uv_layer = bm.loops.layers.uv.active
-
-        for face in faces:
-            for loop in face.loops:
-                positions.extend(loop.vert.co)
-                normals.extend(loop.vert.normal)
-                if uv_layer:
-                    uvs.extend(loop[uv_layer].uv)
-                indices.append(len(indices))
-
-        # Create primitive dictionary
-        primitive = {
-            "attributes": {
-                "POSITION": positions,
-                "NORMAL": normals,
-            },
-            "indices": indices,
-            "mode": 4,  # TRIANGLES
-            "material": material_index
-        }
-
-        if uvs:
-            primitive["attributes"]["TEXCOORD_0"] = uvs
-
-        return primitive
+    def convert_image(self, image: bpy.types.Image) -> TableImage:
+        # This method would convert a Blender image to a TableImage
+        # Implementation depends on how images are set up in your Blender scene
+        pass
