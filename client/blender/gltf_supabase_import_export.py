@@ -7,7 +7,7 @@ import mathutils
 import uuid
 from datetime import datetime
 from jsonpatch import JsonPatch
-from ..vircadia_world_meta.python.meta import (
+from ...shared.modules.vircadia_world_meta.python.meta import (
     World_WorldGLTF, World_Scene, World_Node, World_Mesh, World_Material,
     World_Texture, World_Image, World_Sampler, World_Animation, World_Skin,
     World_Camera, World_Buffer, World_BufferView, World_Accessor,

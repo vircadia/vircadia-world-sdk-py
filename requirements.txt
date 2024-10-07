@@ -1,0 +1,5 @@
+supabase
+jsonpatch
+fake-bpy-module-latest
+pytest
+pydantic

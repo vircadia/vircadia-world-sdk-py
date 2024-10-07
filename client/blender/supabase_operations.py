@@ -1,6 +1,6 @@
 from typing import List, Dict
 from supabase import Client
-from vircadia_world_meta.python.meta import *
+from ....shared.modules.vircadia_world_meta.python.meta import *
 
 class SupabaseOperations:
     def __init__(self, supabase: Client):
