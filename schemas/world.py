@@ -398,12 +398,12 @@ class TableUserProfile:
     username: Optional[str] = None
     full_name: Optional[str] = None
     role: Optional[str] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    general__created_at: Optional[datetime] = None
+    general__updated_at: Optional[datetime] = None
 
 @dataclass
 class TableMetadata:
-    metadata_id: Optional[str] = None
+    general__metadata_id: Optional[str] = None
     key: Optional[str] = None
     values_text: Optional[List[str]] = None
     values_numeric: Optional[List[float]] = None
